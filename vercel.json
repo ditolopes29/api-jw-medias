@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "api_midias.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api_midias.py"
+    }
+  ]
+}
