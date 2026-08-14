@@ -96,7 +96,7 @@ def explorar_diretorio(
                         "nome": "⭐ Em Destaque",
                         "chave": "MergedFeatured", # Nossa chave virtual
                         "tem_subpastas": False,
-                        "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="sm")
+                        "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="lg")
                     })
                     destaque_adicionado = True
             else:
@@ -105,7 +105,7 @@ def explorar_diretorio(
                     "nome": cat.get("name", "Sem Nome"),
                     "chave": chave,
                     "tem_subpastas": cat.get("hasSubcategories", False),
-                    "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="sm")
+                    "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="lg")
                 })
                 
     # 2. TRATAMENTO DA PASTA VIRTUAL (Mesclando os vídeos sem repetir)
@@ -159,7 +159,7 @@ def explorar_diretorio(
                 "nome": cat.get("name", "Sem Nome"),
                 "chave": chave,
                 "tem_subpastas": cat.get("hasSubcategories", False),
-                "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="sm")
+                "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="lg")
             })
 
         for item in itens_midia:
