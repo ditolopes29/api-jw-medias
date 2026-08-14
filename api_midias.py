@@ -5,8 +5,8 @@ import uvicorn
 
 app = FastAPI(
     title="API Explorer JW",
-    description="API definitiva de mídias com navegação de pastas, busca e Front-end integrado.",
-    version="3.3.0"
+    description="API definitiva de mídias com navegação de pastas, busca e Fallback de Imagens.",
+    version="3.4.0"
 )
 
 MEDIATOR_BASE_URL = "https://b.jw-cdn.org/apis/mediator/v1"
@@ -23,7 +23,7 @@ def extrair_melhor_imagem(imagens: dict, tamanho_preferido: str = "lg") -> str:
             return imagens[formato][tamanho_preferido]
     for formato in formatos_prioritarios:
         if formato in imagens:
-            for t in ["xl", "lg", "md", "sm", "xs"]:
+            for t in ["xl","lg", "md", "sm", "xs"]:
                 if t in imagens[formato]:
                     return imagens[formato][t]
     for formato, tamanhos in imagens.items():
@@ -51,6 +51,37 @@ def extrair_todos_arquivos(arquivos: list) -> list:
         })
     arquivos_extraidos.sort(key=lambda x: (x["resolucao"] or 0), reverse=True)
     return arquivos_extraidos
+
+def obter_imagem_fallback(chave: str, idioma: str) -> str:
+    """
+    Entra silenciosamente na pasta para pescar a imagem do primeiro arquivo
+    caso a pasta em si não tenha uma capa definida.
+    """
+    url = f"{MEDIATOR_BASE_URL}/categories/{idioma}/{chave}?detailed=1"
+    try:
+        # Timeout curto para não travar a API caso o servidor deles demore
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        if resp.status_code == 200:
+            dados = resp.json().get("category", {})
+            
+            # 1. Tenta a imagem da própria categoria (que às vezes só vem no detalhe)
+            img = extrair_melhor_imagem(dados.get("images", {}), "xl")
+            if img: return img
+            
+            # 2. Tenta a imagem do primeiro arquivo de mídia dentro dela
+            midias = dados.get("media", [])
+            if midias:
+                img = extrair_melhor_imagem(midias[0].get("images", {}), "xl")
+                if img: return img
+                
+            # 3. Tenta a imagem da primeira subcategoria
+            subs = dados.get("subcategories", [])
+            if subs:
+                img = extrair_melhor_imagem(subs[0].get("images", {}), "xl")
+                if img: return img
+    except:
+        pass
+    return ""
 
 def fazer_requisicao(url: str) -> dict:
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -91,21 +122,29 @@ def explorar_diretorio(
             # Intercepta as 3 pastas de destaque e cria apenas uma
             if chave in chaves_destaque:
                 if not destaque_adicionado:
+                    imagem_final = extrair_melhor_imagem(imagens, tamanho_preferido="xl")
+                    if not imagem_final:
+                        imagem_final = obter_imagem_fallback(chave, idioma)
+                        
                     conteudo.append({
                         "tipo": "pasta",
                         "nome": "⭐ Em Destaque",
-                        "chave": "MergedFeatured", # Nossa chave virtual
+                        "chave": "MergedFeatured",
                         "tem_subpastas": False,
-                        "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="xl")
+                        "imagem": imagem_final
                     })
                     destaque_adicionado = True
             else:
+                imagem_final = extrair_melhor_imagem(imagens, tamanho_preferido="xl")
+                if not imagem_final:
+                    imagem_final = obter_imagem_fallback(chave, idioma)
+                    
                 conteudo.append({
                     "tipo": "pasta",
                     "nome": cat.get("name", "Sem Nome"),
                     "chave": chave,
                     "tem_subpastas": cat.get("hasSubcategories", False),
-                    "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="xl")
+                    "imagem": imagem_final
                 })
                 
     # 2. TRATAMENTO DA PASTA VIRTUAL (Mesclando os vídeos sem repetir)
@@ -123,13 +162,12 @@ def explorar_diretorio(
                 itens = dados.get("category", {}).get("media", [])
                 
                 for item in itens:
-                    # Usa o GUID ou o Título para garantir que não repetirá
                     identificador = item.get("guid", item.get("title", ""))
                     if identificador not in ids_vistos:
                         ids_vistos.add(identificador)
                         midias_mescladas.append(item)
             except:
-                pass # Se uma das chaves falhar, ignora e segue mesclando o resto
+                pass
                 
         for item in midias_mescladas:
             lista_arquivos = extrair_todos_arquivos(item.get("files", []))
@@ -137,7 +175,7 @@ def explorar_diretorio(
                 conteudo.append({
                     "tipo": "arquivo",
                     "titulo": item.get("title", "Sem título"),
-                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="xl"),
+                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="lg"),
                     "total_formatos": len(lista_arquivos),
                     "downloads": lista_arquivos
                 })
@@ -154,12 +192,17 @@ def explorar_diretorio(
         for cat in categorias:
             chave = cat.get("key")
             imagens = cat.get("images", {})
+            
+            imagem_final = extrair_melhor_imagem(imagens, tamanho_preferido="xl")
+            if not imagem_final:
+                imagem_final = obter_imagem_fallback(chave, idioma)
+                
             conteudo.append({
                 "tipo": "pasta",
                 "nome": cat.get("name", "Sem Nome"),
                 "chave": chave,
                 "tem_subpastas": cat.get("hasSubcategories", False),
-                "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="xl")
+                "imagem": imagem_final
             })
 
         for item in itens_midia:
@@ -168,7 +211,7 @@ def explorar_diretorio(
                 conteudo.append({
                     "tipo": "arquivo",
                     "titulo": item.get("title", "Sem título"),
-                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="xl"),
+                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="lg"),
                     "total_formatos": len(lista_arquivos),
                     "downloads": lista_arquivos
                 })
@@ -235,7 +278,7 @@ def interface_visual():
 
             async function carregarPasta(chave_pasta) {
                 document.getElementById('grid-conteudo').innerHTML = "";
-                document.getElementById('input-busca').value = ""; // Limpa a busca ao trocar de pasta
+                document.getElementById('input-busca').value = "";
                 document.getElementById('loader').style.display = "block";
                 
                 try {
