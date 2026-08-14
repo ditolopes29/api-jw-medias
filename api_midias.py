@@ -23,7 +23,7 @@ def extrair_melhor_imagem(imagens: dict, tamanho_preferido: str = "lg") -> str:
             return imagens[formato][tamanho_preferido]
     for formato in formatos_prioritarios:
         if formato in imagens:
-            for t in ["lg", "md", "sm", "xs"]:
+            for t in ["xl", "lg", "md", "sm", "xs"]:
                 if t in imagens[formato]:
                     return imagens[formato][t]
     for formato, tamanhos in imagens.items():
@@ -96,7 +96,7 @@ def explorar_diretorio(
                         "nome": "⭐ Em Destaque",
                         "chave": "MergedFeatured", # Nossa chave virtual
                         "tem_subpastas": False,
-                        "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="lg")
+                        "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="xl")
                     })
                     destaque_adicionado = True
             else:
@@ -105,7 +105,7 @@ def explorar_diretorio(
                     "nome": cat.get("name", "Sem Nome"),
                     "chave": chave,
                     "tem_subpastas": cat.get("hasSubcategories", False),
-                    "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="lg")
+                    "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="xl")
                 })
                 
     # 2. TRATAMENTO DA PASTA VIRTUAL (Mesclando os vídeos sem repetir)
@@ -137,7 +137,7 @@ def explorar_diretorio(
                 conteudo.append({
                     "tipo": "arquivo",
                     "titulo": item.get("title", "Sem título"),
-                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="lg"),
+                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="xl"),
                     "total_formatos": len(lista_arquivos),
                     "downloads": lista_arquivos
                 })
@@ -159,7 +159,7 @@ def explorar_diretorio(
                 "nome": cat.get("name", "Sem Nome"),
                 "chave": chave,
                 "tem_subpastas": cat.get("hasSubcategories", False),
-                "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="lg")
+                "imagem": extrair_melhor_imagem(imagens, tamanho_preferido="xl")
             })
 
         for item in itens_midia:
@@ -168,7 +168,7 @@ def explorar_diretorio(
                 conteudo.append({
                     "tipo": "arquivo",
                     "titulo": item.get("title", "Sem título"),
-                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="lg"),
+                    "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="xl"),
                     "total_formatos": len(lista_arquivos),
                     "downloads": lista_arquivos
                 })
