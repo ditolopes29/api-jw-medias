@@ -5,14 +5,14 @@ import uvicorn
 
 app = FastAPI(
     title="API Explorer JW",
-    description="API definitiva de mídias com navegação de pastas, busca e Fallback de Imagens.",
-    version="3.4.0"
+    description="API definitiva de mídias com navegação de pastas, busca, Fallback de Imagens, Duração e Datas.",
+    version="3.5.0"
 )
 
 MEDIATOR_BASE_URL = "https://b.jw-cdn.org/apis/mediator/v1"
 
 # ==========================================
-# Funções Auxiliares (Extratores)
+# Funções Auxiliares (Extratores e Formatadores)
 # ==========================================
 def extrair_melhor_imagem(imagens: dict, tamanho_preferido: str = "lg") -> str:
     if not imagens:
@@ -53,28 +53,20 @@ def extrair_todos_arquivos(arquivos: list) -> list:
     return arquivos_extraidos
 
 def obter_imagem_fallback(chave: str, idioma: str) -> str:
-    """
-    Entra silenciosamente na pasta para pescar a imagem do primeiro arquivo
-    caso a pasta em si não tenha uma capa definida.
-    """
     url = f"{MEDIATOR_BASE_URL}/categories/{idioma}/{chave}?detailed=1"
     try:
-        # Timeout curto para não travar a API caso o servidor deles demore
         resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if resp.status_code == 200:
             dados = resp.json().get("category", {})
             
-            # 1. Tenta a imagem da própria categoria (que às vezes só vem no detalhe)
             img = extrair_melhor_imagem(dados.get("images", {}), "xl")
             if img: return img
             
-            # 2. Tenta a imagem do primeiro arquivo de mídia dentro dela
             midias = dados.get("media", [])
             if midias:
                 img = extrair_melhor_imagem(midias[0].get("images", {}), "xl")
                 if img: return img
                 
-            # 3. Tenta a imagem da primeira subcategoria
             subs = dados.get("subcategories", [])
             if subs:
                 img = extrair_melhor_imagem(subs[0].get("images", {}), "xl")
@@ -93,6 +85,30 @@ def fazer_requisicao(url: str) -> dict:
         )
     return resposta.json()
 
+def formatar_data(data_iso: str) -> str:
+    """Converte datas no formato YYYY-MM-DD para DD/MM/YYYY"""
+    if not data_iso:
+        return ""
+    try:
+        apenas_data = data_iso.split("T")[0]
+        ano, mes, dia = apenas_data.split("-")
+        return f"{dia}/{mes}/{ano}"
+    except:
+        return data_iso
+
+def formatar_duracao(segundos) -> str:
+    """Converte segundos totais em MM:SS ou HH:MM:SS"""
+    try:
+        seg = int(float(segundos))
+        minutos = seg // 60
+        segundos_rest = seg % 60
+        if minutos >= 60:
+            horas = minutos // 60
+            minutos_rest = minutos % 60
+            return f"{horas}:{minutos_rest:02d}:{segundos_rest:02d}"
+        return f"{minutos}:{segundos_rest:02d}"
+    except:
+        return ""
 
 # ==========================================
 # Rotas da API (Back-end)
@@ -119,7 +135,6 @@ def explorar_diretorio(
             chave = cat.get("key")
             imagens = cat.get("images", {})
             
-            # Intercepta as 3 pastas de destaque e cria apenas uma
             if chave in chaves_destaque:
                 if not destaque_adicionado:
                     imagem_final = extrair_melhor_imagem(imagens, tamanho_preferido="xl")
@@ -172,10 +187,16 @@ def explorar_diretorio(
         for item in midias_mescladas:
             lista_arquivos = extrair_todos_arquivos(item.get("files", []))
             if lista_arquivos:
+                data_bruta = item.get("firstPublished", item.get("datetime", ""))
+                duracao_api = item.get("durationFormattedHHMM")
+                duracao_seg = lista_arquivos[0]["duracao_segundos"]
+                
                 conteudo.append({
                     "tipo": "arquivo",
                     "titulo": item.get("title", "Sem título"),
                     "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="lg"),
+                    "data_publicacao": formatar_data(data_bruta),
+                    "duracao": duracao_api if duracao_api else formatar_duracao(duracao_seg),
                     "total_formatos": len(lista_arquivos),
                     "downloads": lista_arquivos
                 })
@@ -208,10 +229,16 @@ def explorar_diretorio(
         for item in itens_midia:
             lista_arquivos = extrair_todos_arquivos(item.get("files", []))
             if lista_arquivos:
+                data_bruta = item.get("firstPublished", item.get("datetime", ""))
+                duracao_api = item.get("durationFormattedHHMM")
+                duracao_seg = lista_arquivos[0]["duracao_segundos"]
+
                 conteudo.append({
                     "tipo": "arquivo",
                     "titulo": item.get("title", "Sem título"),
                     "imagem": extrair_melhor_imagem(item.get("images", {}), tamanho_preferido="lg"),
+                    "data_publicacao": formatar_data(data_bruta),
+                    "duracao": duracao_api if duracao_api else formatar_duracao(duracao_seg),
                     "total_formatos": len(lista_arquivos),
                     "downloads": lista_arquivos
                 })
@@ -252,6 +279,7 @@ def interface_visual():
             .card img { max-width: 100%; height: 120px; object-fit: cover; border-radius: 5px; margin-bottom: 10px; }
             .icon-pasta { font-size: 40px; margin-bottom: 10px; }
             .card-title { font-size: 14px; font-weight: bold; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+            .meta-info { font-size: 12px; color: #777; margin-top: 8px; margin-bottom: 8px; font-weight: 500; }
             .file-card { cursor: default; }
             .download-links { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
             .download-links a { text-decoration: none; font-size: 12px; background: #28a745; color: white; padding: 5px; border-radius: 3px; }
@@ -320,6 +348,12 @@ def interface_visual():
                         card.classList.add('file-card');
                         let imgHtml = item.imagem ? `<img src="${item.imagem}" alt="capa">` : `<div class="icon-pasta">🎵</div>`;
                         
+                        // Metadados de Data e Duração
+                        let metaInfos = [];
+                        if (item.data_publicacao) metaInfos.push(`📅 ${item.data_publicacao}`);
+                        if (item.duracao) metaInfos.push(`⏱️ ${item.duracao}`);
+                        let metaHtml = metaInfos.length > 0 ? `<div class="meta-info">${metaInfos.join(' &nbsp;•&nbsp; ')}</div>` : '';
+                        
                         let linksHtml = item.downloads.map(dl => 
                             `<a href="${dl.url_download}" target="_blank">Baixar ${dl.formato.toUpperCase()} (${dl.resolucao ? dl.resolucao + 'p - ' : ''}${dl.tamanho_mb} MB)</a>`
                         ).join('');
@@ -327,6 +361,7 @@ def interface_visual():
                         card.innerHTML = `
                             ${imgHtml}
                             <p class="card-title">${item.titulo}</p>
+                            ${metaHtml}
                             <div class="download-links">${linksHtml}</div>
                         `;
                     }
