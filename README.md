@@ -60,6 +60,10 @@ O projeto possui um arquivo `vercel.json` configurado para rodar o FastAPI como 
    ```
 3. Siga os prompts para criar e publicar a aplicação.
 
-## 📄 Licença
+## 📄 Licença e Termos de Uso
 
 Este é um projeto não-oficial para propósitos educacionais, de pesquisa e de organização pessoal das mídias públicas disponíveis pelo JW.org. Todos os direitos e mídias pertencem a Watch Tower Bible and Tract Society of Pennsylvania.
+
+Este projeto está em conformidade com os [Termos de Uso do jw.org](https://www.jw.org/pt/termos-de-uso/), que estabelecem:
+
+> "Isso não proíbe a distribuição gratuita, sem fins comerciais, de aplicativos projetados para baixar arquivos eletrônicos como EPUB, PDF, MP3 e arquivos MP4 das áreas públicas deste site."
